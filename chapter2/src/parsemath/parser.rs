@@ -1,5 +1,4 @@
 use std::fmt;
-use std::result::Result;
 
 use super::{ast::Node, token::{OperPrec, Token}, tokenizer::Tokenizer};
 
@@ -22,7 +21,13 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub fn parse(&mut self) -> Result<Node,>
+    pub fn parse(&mut self) -> Result<Node,ParseError> {
+        let ast = self.generate_ast(OperPrec::DefaultZero);
+        match ast {
+            Ok(ast) => Ok(ast),
+            Err(e) => Err(e)
+        }
+    }
 }
 
 impl<'a> Parser<'a> {
@@ -36,7 +41,16 @@ impl<'a> Parser<'a> {
     }
 
     fn generate_ast(&mut self,oper_prec: OperPrec) -> Result<Node, ParseError> {
-        let mut letf_expr = self.parse
+        let mut left_expr = self.parse_number()?;
+
+        while oper_prec < self.current_token.get_oper_prec() {
+            if self.current_token == Token::EOF {
+                break;
+            }
+            let right_expr = self.convert_token_to_node(left_expr.clone())?;
+            left_expr = right_expr;
+        }
+        Ok(left_expr)
     }
 
     fn parse_number(&mut self) -> Result<Node,ParseError> {
@@ -48,12 +62,69 @@ impl<'a> Parser<'a> {
                 Ok(Node::Negative(Box::new(expr)))
             }
             Token::Num(i) => {
-                self.get_next_token()
+                self.get_next_token()?;
+                Ok(Node::Number(i))
             }
-
+            Token::LeftParen => {
+                self.get_next_token()?;
+                let expr = self.generate_ast(OperPrec::DefaultZero)?;
+                self.check_paren(Token::RightParen)?;
+                if self.current_token == Token::LeftParen {
+                    let right = self.generate_ast(OperPrec::MulDiv)?;
+                    return Ok(Node::Multiply(Box::new(expr), Box::new(right)));
+                }
+                Ok(expr)
+            }
+            _ => Err(ParseError::UnableToParse("Unable to parse".to_string())),
         }
     }
-    
+
+    fn check_paren(&mut self, expected: Token) -> Result<(), ParseError> {
+        if expected == self.current_token {
+            self.get_next_token()?;
+            Ok(())
+        } else {
+            Err(ParseError::InvalidOperator(format!(
+                "Expected {:?}, got {:?}",
+                expected, self.current_token
+            )))
+        }
+    }
+
+    fn convert_token_to_node(&mut self,left_expr: Node) -> Result<Node,ParseError> {
+        match self.current_token {
+            Token::Add => {
+                self.get_next_token()?;
+                let right_expr = self.generate_ast(OperPrec::AddSub)?;
+                Ok(Node::Add(Box::new(left_expr), Box::new(right_expr)))
+            }
+            Token::Subtract => {
+                self.get_next_token()?;
+                let right_expr = self.generate_ast(OperPrec::AddSub)?;
+                Ok(Node::Subtract(Box::new(left_expr), Box::new(right_expr)))
+            }
+            Token::Multiply => {
+                self.get_next_token()?;
+                let right_expr = self.generate_ast(OperPrec::MulDiv)?;
+                Ok(Node::Multiply(Box::new(left_expr), Box::new(right_expr)))
+            }
+            Token::Divide => {
+                self.get_next_token()?;
+                let right_expr = self.generate_ast(OperPrec::MulDiv)?;
+                Ok(Node::Divide(Box::new(left_expr), Box::new(right_expr)))
+            }
+            Token::Caret => {
+                self.get_next_token()?;
+                let right_expr = self.generate_ast(OperPrec::Power)?;
+                Ok(Node::Caret(Box::new(left_expr), Box::new(right_expr)))
+            }
+            _ => {
+                Err(ParseError::InvalidOperator(format!("Please enter valid operator {:?}",self.current_token)))
+            }
+        }
+    }
+
+
 }
 
 #[derive(Debug)]

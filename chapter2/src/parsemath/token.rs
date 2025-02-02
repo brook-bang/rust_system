@@ -15,7 +15,7 @@ pub enum Token {
 pub enum OperPrec {
     DefaultZero,
     AddSub,
-    MulDic,
+    MulDiv,
     Power,
     Negative,
 }
@@ -26,7 +26,7 @@ impl Token {
         use self::Token::*;
         match *self {
             Add | Subtract => AddSub,
-            Multiply | Divide => MulDic,
+            Multiply | Divide => MulDiv,
             Caret => Power,
             _ => DefaultZero,
         }
