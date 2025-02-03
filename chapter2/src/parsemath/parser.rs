@@ -141,3 +141,10 @@ impl fmt::Display for ParseError {
     }
 }
 
+impl std::convert::From<std::boxed::Box<dyn std::error::Error>> for ParseError {
+    fn from(_evalerr: std::boxed::Box<dyn std::error::Error>) -> Self {
+        return ParseError::UnableToParse("Unable to parse".into());
+    }
+    
+}
+
