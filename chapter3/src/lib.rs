@@ -1,3 +1,5 @@
+use std::{collections::HashMap, hash::Hash, task::Context};
+
 #[derive(PartialEq,Debug)]
 pub enum ContentType {
     Literal(String),
@@ -52,11 +54,55 @@ pub fn get_content_type(input_line: &str) -> ContentType {
     let is_if_tag = check_symbol_string(&input_line, "if") || check_symbol_string(&input_line, "endif");
     let is_template_variable = check_matching_pair(&input_line, "{{", "}}");
 
-    
+    if is_tag_expression && is_for_tag {
+        ContentType::Tag(TagType::ForTag)
+    } else if is_tag_expression && is_if_tag {
+        ContentType::Tag(TagType::IfTag)
+    } else if is_template_variable {
+        let content = get_expression_data(&input_line);
+        ContentType::TemplateVariable(content)
+    } else if !is_tag_expression && !is_template_variable {
+        ContentType::Literal(input_line.to_string())
+    } else {
+        ContentType::Unrecognized
+    }
+}
 
+pub fn generate_html_template_var(
+    content: ExpressionData,
+    context: HashMap<String,String>,
+) -> String {
 
+    let mut html = String::new();
 
+    if let Some(h) = content.head {
+        html.push_str(&h);
+    }
 
+    if let Some(val) = context.get(&content.variable) {
+        html.push_str(&val);
+    }
+
+    if let Some(t) = content.tail {
+        html.push_str(&t);
+        
+    }
+
+    html
+
+}
+
+pub fn get_expression_data(input_line: &str) -> ExpressionData {
+    let (_h,i) = get_index_for_symbol(input_line, '{');
+    let head = input_line[0..i].to_string();
+    let (_j,k) = get_index_for_symbol(input_line, '}');
+    let variable = input_line[i+1+1..k].to_string();
+    let tail = input_line[k+1+1..].to_string();
+    ExpressionData {
+        head: Some(head),
+        variable: variable,
+        tail: Some(tail),
+    }
 }
 
 
@@ -65,7 +111,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn check_literal_test() {
+    fn check_get_index_for_symbol_test() {
         let s = "<h1>Hello world<h2>";
         assert_eq!(ContentType::Literal(s.to_string()),get_content_type(s));
     }
