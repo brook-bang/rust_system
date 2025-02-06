@@ -53,19 +53,20 @@ pub fn get_content_type(input_line: &str) -> ContentType {
     let is_if_tag =
         check_symbol_string(&input_line, "if") || check_symbol_string(&input_line, "endif");
     let is_template_variable = check_matching_pair(&input_line, "{{", "}}");
-
+    let return_val;
     if is_tag_expression && is_for_tag {
-        ContentType::Tag(TagType::ForTag)
+        return_val = ContentType::Tag(TagType::ForTag);
     } else if is_tag_expression && is_if_tag {
-        ContentType::Tag(TagType::IfTag)
+        return_val = ContentType::Tag(TagType::IfTag);
     } else if is_template_variable {
         let content = get_expression_data(&input_line);
-        ContentType::TemplateVariable(content)
+        return_val = ContentType::TemplateVariable(content);
     } else if !is_tag_expression && !is_template_variable {
-        ContentType::Literal(input_line.to_string())
+        return_val = ContentType::Literal(input_line.to_string());
     } else {
-        ContentType::Unrecognized
+        return_val = ContentType::Unrecognized;
     }
+    return_val
 }
 
 pub fn generate_html_template_var(
@@ -73,6 +74,7 @@ pub fn generate_html_template_var(
     context: HashMap<String, String>,
 ) -> String {
     let mut html = String::new();
+    println!("expression data is:{:?}", content);
 
     if let Some(h) = content.head {
         html.push_str(&h);
@@ -142,7 +144,7 @@ mod tests {
 
     #[test]
     fn check_literal_test() {
-        let s = "<h1>Hello world<h1>";
+        let s = "<h1>Hello world</h1>";
         assert_eq!(ContentType::Literal(s.to_string()), get_content_type(s));
     }
 
