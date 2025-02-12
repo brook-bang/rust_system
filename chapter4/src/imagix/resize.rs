@@ -1,6 +1,13 @@
+use core::time;
 use std::{
-    fmt::{self, Display}, path::PathBuf, str::FromStr, time::{Duration, Instant}
+    fmt::{self, Display},
+    fs, io,
+    path::PathBuf,
+    str::FromStr,
+    time::{Duration, Instant},
 };
+
+use image::ImageFormat;
 
 use crate::error::ImagixError;
 
@@ -68,7 +75,7 @@ pub fn processing_resize_request(
     size: SizeOption,
     mode: Mode,
     src_folder: &mut PathBuf,
-) -> Result<(),ImagixError> {
+) -> Result<(), ImagixError> {
     let size = match size {
         SizeOption::Small => 200,
         SizeOption::Medium => 400,
@@ -76,14 +83,68 @@ pub fn processing_resize_request(
     };
 
     let _ = match mode {
-        Mode::All => resize_all
-        
+        Mode::All => resize_all,
     };
-
 }
 
-fn resize_all(size: u32, src_folder: &mut PathBuf) -> Result<(),ImagixError> {
-    if let Ok(entries) = get_image_
+fn resize_all(size: u32, src_folder: &mut PathBuf) -> Result<(), ImagixError> {
+    if let Ok(entries) = get_image_files(src_folder.to_path_buf()) {
+        for mut entry in entries {
+            resize_image(size, &mut entry)?;
+        }
+    };
+    Ok(())
 }
 
+fn resize_image(size: u32, src_folder: &mut PathBuf) -> Result<(), ImagixError> {
+    let new_file_name = src_folder
+        .file_stem()
+        .unwrap()
+        .to_str()
+        .ok_or(std::io::ErrorKind::InvalidInput)
+        .map(|f| format!("{}.ping", f));
 
+    let mut dest_folder = src_folder.clone();
+    dest_folder.pop();
+    dest_folder.push("tmp/");
+    if !dest_folder.exists(){
+        fs::create_dir(&dest_folder)?;
+    }
+    dest_folder.pop();
+    dest_folder.push("tmp/tmp.png");
+    dest_folder.set_file_name(new_file_name?.as_str());
+
+    let timer = Instant::now();
+    let img = image::open(&src_folder)?;
+    let scaled = img.thumbnail(size, size);
+    let mut output = fs::File::create(&dest_folder)?;
+    scaled.write_to(&mut output, ImageFormat::Png)?;
+
+    println!(
+        "Thumbnailed file: {:?} to size {}x{} in {}. Output file in {:?}",
+        src_folder,
+        size,
+        size,
+        Elapsed::from(&timer),
+        dest_folder
+    );
+
+
+    Ok(())
+}
+
+pub fn get_image_files(src_folder: PathBuf) -> Result<Vec<PathBuf>, ImagixError> {
+    let entries = fs::read_dir(src_folder)
+        .map_err(|_e| ImagixError::UserInputError("Invalid source folder".to_string()))?
+        .map(|res| res.map(|e| e.path()))
+        .collect::<Result<Vec<_>, io::Error>>()?
+        .into_iter()
+        .filter(|r| {
+            r.extension() == Some("JPG".as_ref())
+                || r.extension() == Some("jpg".as_ref())
+                || r.extension() == Some("PNG".as_ref())
+                || r.extension() == Some("ping".as_ref())
+        })
+        .collect();
+    Ok(entries)
+}
