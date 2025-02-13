@@ -1,15 +1,11 @@
-use core::time;
-use std::{
-    fmt::{self, Display},
-    fs, io,
-    path::PathBuf,
-    str::FromStr,
-    time::{Duration, Instant},
-};
-
 use image::ImageFormat;
+use std::path::PathBuf;
+use std::result::Result;
+use std::str::FromStr;
+use std::time::{Duration, Instant};
+use std::{fmt, fs, io};
 
-use crate::error::ImagixError;
+use super::error::ImagixError;
 
 struct Elapsed(Duration);
 
@@ -71,7 +67,7 @@ impl FromStr for Mode {
     }
 }
 
-pub fn processing_resize_request(
+pub fn process_resize_request(
     size: SizeOption,
     mode: Mode,
     src_folder: &mut PathBuf,
@@ -83,8 +79,16 @@ pub fn processing_resize_request(
     };
 
     let _ = match mode {
-        Mode::All => resize_all,
+        Mode::All => resize_all(size,src_folder)?,
+        Mode::Single => resize_single(size, src_folder)?,
     };
+    Ok(())
+}
+
+fn resize_single(size:u32,src_folder: &mut PathBuf) -> Result<(),ImagixError> {
+    let mut src_folder = src_folder;
+    resize_image(size, &mut src_folder)?;
+    Ok(())
 }
 
 fn resize_all(size: u32, src_folder: &mut PathBuf) -> Result<(), ImagixError> {
@@ -147,4 +151,30 @@ pub fn get_image_files(src_folder: PathBuf) -> Result<Vec<PathBuf>, ImagixError>
         })
         .collect();
     Ok(entries)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_single_image_resize() {
+        let mut path = PathBuf::from("/tmp/images/image1.jpj");
+        let destination_path = PathBuf::from("/tmp/images/tmp/image1.png");
+        match process_resize_request(SizeOption::Small, Mode::Single, &mut path) {
+            Ok(_) => println!("Successful resize of single image"),
+            Err(e) => println!("Error in single image: {:?}",e),
+        }
+        assert_eq!(true,destination_path.exists());
+    }
+
+    #[test]
+    fn test_multiple_image_resize(){
+        let mut path = PathBuf::from("/tmp/images");
+        let _res = process_resize_request(SizeOption::Small, Mode::All, &mut path);
+        let destination_path1 = PathBuf::from("/tmp/images/tmp/image1.png");
+        let destination_path2 = PathBuf::from("/tmp/images/tmp/image2.png");
+        assert_eq!(true,destination_path1.exists());
+        assert_eq!(true,destination_path2.exists());
+    }
 }
