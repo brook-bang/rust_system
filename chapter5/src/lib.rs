@@ -80,7 +80,15 @@ pub fn generate_html_template_var(
     content: &mut ExpressionData,
     context: HashMap<String,String>,
 ) -> &mut ExpressionData {
-    
+    content.gen_html = content.expression.clone();
+    for var in &content.var_map {
+        let (_h,i) = get_index_for_symbol(&var, '{');
+        let (_j,k) = get_index_for_symbol(&var, '}');
+        let var_without_braces = &var[i + 2..k];
+        let val = context.get(var_without_braces).unwrap();
+        content.gen_html = content.gen_html.replace(var, val);
+    }
+    content
 }
 
 pub fn get_expression_data(input_line: &str) -> ExpressionData {
@@ -97,6 +105,68 @@ pub fn get_expression_data(input_line: &str) -> ExpressionData {
         expression: input_line.into(),
         var_map: template_var_map,
         gen_html: "".into(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_get_index_for_symbol_test() {
+        assert_eq!((true,3),get_index_for_symbol("Hi {name} bye", '{'));
+    }
+
+    #[test]
+    fn check_template_var_test() {
+        let content = "Hi {{name}} bye".into();
+        let expr_data = ExpressionData {
+            expression: content,
+            var_map: vec!["{{name}}".to_string()],
+            gen_html: "".into(),
+        };
+        assert_eq!(
+            ContentType::TemplateVariable(expr_data),
+            get_content_type("Hi {{name}} bye")
+        );
+    }
+
+    #[test]
+    fn check_if_tag_test(){
+        assert_eq!(
+            ContentType::Tag(TagType::IfTag),
+            get_content_type("{% if name == 'Bob' %}")
+        );
+    }
+
+    #[test]
+    fn check_literal_test() {
+        let s = "<h1>Hello world</h1>";
+        assert_eq!(ContentType::Literal(s.to_string()),get_content_type(s));
+    }
+
+    #[test]
+    fn check_get_expression_data_test() {
+        let map_var = vec!["{{name}}".to_string(),"{{city}}".to_string()];
+        let expression_data = ExpressionData {
+            expression: "Hi {{name}} , welcome to {{city}}".into(),
+            var_map: map_var,
+            gen_html: "".into(),
+        };
+        assert_eq!(
+            expression_data,
+            get_expression_data("Hi {{name}} , welcome to {{city}}")
+        );
+    }
+
+    #[test]
+    fn check_symbol_string_test(){
+        assert_eq!(true,check_symbol_string("{{Hello}}", "{{"));
+    }
+
+    #[test]
+    fn check_symbol_pair_test() {
+        assert_eq!(true,check_matching_pair("{{hello}}", "{{", "}}"));
     }
 }
 
