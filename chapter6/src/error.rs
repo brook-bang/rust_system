@@ -1,6 +1,7 @@
 use core::fmt;
 use std::{fmt::Display, io, num::TryFromIntError};
 
+#[derive(Debug)]
 pub struct StatsError {
     pub message: String,
 }

@@ -35,14 +35,23 @@ pub fn get_summary_src_stats(in_dir: &Path) -> Result<SrcStats,StatsError> {
     let file_count = file_entries.len();
 
     for entry in file_entries {
-        let stat
+        let stat = get_src_stats_for_file(&entry.path())?;
+        total_loc += stat.loc;
+        total_blanks += stat.blanks;
+        total_comments += stat.comments;
     }
+    Ok(SrcStats{
+        number_of_files: u32::try_from(file_count)?,
+        loc: total_loc,
+        comments: total_comments,
+        blanks: total_blanks,
+    })
 
 }
 
 pub fn get_src_stats_for_file(file_name: &Path) -> Result<SrcStats,StatsError> {
     let file_contents = fs::read_to_string(file_name)?;
-    let mut lock = 0;
+    let mut loc = 0;
     let mut blanks = 0;
     let mut comments = 0;
 
@@ -56,7 +65,15 @@ pub fn get_src_stats_for_file(file_name: &Path) -> Result<SrcStats,StatsError> {
         }
     }
 
-    Ok(())
-    
+    let source_stats = SrcStats {
+        number_of_files: u32::try_from(file_contents.lines().count())?,
+        loc: loc,
+        comments: comments,
+        blanks: blanks,
+    };
 
+    Ok(source_stats)
 }
+
+//运行命令: cargo run --release -- -m src .
+
